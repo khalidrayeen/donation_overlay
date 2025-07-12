@@ -56,18 +56,50 @@
 </head>
 
 <body>
+    <!-- Click-to-start overlay -->
+    <div id="clickOverlay">
+        <div class="click-text">🔊 Click Anywhere to Start Alerts</div>
+    </div>
+
+    <!-- Donation alert box -->
     <div id="alert">Waiting for donations...</div>
     <audio id="ding" src="ding.mp3" preload="auto"></audio>
 
+    <!-- JS & WebSocket libs -->
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
 
     <script>
         const alertBox = document.getElementById("alert");
         const audio = document.getElementById("ding");
+        const clickOverlay = document.getElementById("clickOverlay");
+
+        // Wait for user interaction to enable sound
+        clickOverlay.addEventListener("click", () => {
+            audio.play().catch(() => { }); // trigger browser permission
+            clickOverlay.style.display = "none";
+            connectWebSocket();
+        });
+
+        function connectWebSocket() {
+            const socket = new SockJS("https://upialert-production.up.railway.app/ws");
+            const stompClient = Stomp.over(socket);
+            stompClient.debug = false;
+
+            stompClient.connect({}, (frame) => {
+                console.log("✅ Connected:", frame);
+                stompClient.subscribe("/topic/alerts", (msg) => {
+                    const data = JSON.parse(msg.body);
+                    console.log("📦 Received:", data);
+                    showAlert(data.name, data.amount);
+                });
+            }, (error) => {
+                console.error("❌ WebSocket error:", error);
+            });
+        }
 
         function showAlert(name, amount) {
-            const duration = Math.min(10000, 3000 + amount * 50); // scale with amount
+            const duration = Math.min(10000, 3000 + amount * 50);
             const message = `₹${amount} received from ${name}`;
             console.log("🎬 Showing alert:", message);
 
@@ -85,23 +117,95 @@
                 alertBox.style.animation = '';
             }, duration + 100);
         }
-
-        // ✅ Update to use production backend WebSocket endpoint
-        const socket = new SockJS("https://upialert-production.up.railway.app/ws");
-        const stompClient = Stomp.over(socket);
-        stompClient.debug = false;
-
-        stompClient.connect({}, (frame) => {
-            console.log("✅ Connected:", frame);
-            stompClient.subscribe("/topic/alerts", (msg) => {
-                const data = JSON.parse(msg.body);
-                console.log("📦 Received:", data);
-                showAlert(data.name, data.amount);
-            });
-        }, (error) => {
-            console.error("❌ WebSocket error:", error);
-        });
     </script>
+
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        #alert {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 10px 25px;
+            font-size: 1.4rem;
+            font-family: 'Segoe UI', sans-serif;
+            border-radius: 10px;
+            opacity: 0;
+            pointer-events: none;
+            white-space: nowrap;
+            animation-fill-mode: forwards;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes fadeInOut {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+
+            10% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+
+            90% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+        }
+
+        #clickOverlay {
+            position: fixed;
+            z-index: 999;
+            background: rgba(0, 0, 0, 0.95);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .click-text {
+            color: #fff;
+            font-size: 2rem;
+            font-family: 'Segoe UI', sans-serif;
+            text-align: center;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 0.6;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
 </body>
+
 
 </html>
