@@ -73,9 +73,7 @@
             display: flex;
             flex-direction: column-reverse;
             gap: 10px;
-            max-height: 90%;
-            overflow-y: auto;
-            padding-bottom: 20px;
+            max-height: 100%;
             z-index: 9;
         }
 
@@ -162,11 +160,16 @@
                 topDonatorBox.innerHTML = `🥇 Top Donator: <b>${name}</b> - ₹${amount}`;
             }
 
-            // Add donation to DOM
+            // Create alert element
             const el = document.createElement("div");
             el.classList.add("alert");
             el.textContent = `₹${amount} received from ${name}`;
             alertContainer.appendChild(el);
+
+            // Maintain only last 2
+            while (alertContainer.childElementCount > 2) {
+                alertContainer.removeChild(alertContainer.firstChild);
+            }
 
             // Reset auto-clear timer
             resetInFiveHours();
