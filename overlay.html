@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Donation Overlay</title>
     <style>
         html,
@@ -65,74 +65,66 @@
             z-index: 10;
         }
 
-        #alert {
+        #alertContainer {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 10px;
+            max-height: 90%;
+            overflow-y: auto;
+            padding-bottom: 20px;
+            z-index: 9;
+        }
+
+        .alert {
             background-color: rgba(0, 0, 0, 0.85);
             color: #fff;
             padding: 10px 25px;
             font-size: 1.4rem;
             font-family: 'Segoe UI', sans-serif;
             border-radius: 10px;
-            opacity: 0;
-            pointer-events: none;
             white-space: nowrap;
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-            transition: all 0.4s ease;
+            animation: slideUp 0.5s ease-out;
         }
 
-        .slide-up {
-            animation: slideUpFade 1s ease-out forwards;
-        }
-
-        @keyframes slideUpFade {
+        @keyframes slideUp {
             0% {
+                transform: translateY(30px);
                 opacity: 0;
-                transform: translateX(-50%) translateY(40px);
-            }
-
-            10% {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0);
-            }
-
-            90% {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0);
             }
 
             100% {
-                opacity: 0;
-                transform: translateX(-50%) translateY(-20px);
+                transform: translateY(0);
+                opacity: 1;
             }
         }
     </style>
 </head>
 
 <body>
-    <!-- Click-to-start overlay -->
     <div id="clickOverlay">
         <div class="click-text">🔊 Click Anywhere to Start Alerts</div>
     </div>
 
     <div id="topDonator">🥇 Top Donator: None</div>
-    <div id="alert">Waiting for donations...</div>
+    <div id="alertContainer"></div>
     <audio id="ding" src="ding.mp3" preload="auto"></audio>
 
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
 
     <script>
-        const alertBox = document.getElementById("alert");
-        const audio = document.getElementById("ding");
+        const alertContainer = document.getElementById("alertContainer");
         const topDonatorBox = document.getElementById("topDonator");
         const clickOverlay = document.getElementById("clickOverlay");
+        const audio = document.getElementById("ding");
 
-        const donationQueue = [];
-        let isShowing = false;
         let topDonator = { name: "", amount: 0 };
+        let resetTimer = null;
 
         clickOverlay.addEventListener("click", () => {
             audio.play().catch(() => { });
@@ -148,31 +140,15 @@
             stompClient.connect({}, () => {
                 stompClient.subscribe("/topic/alerts", (msg) => {
                     const data = JSON.parse(msg.body);
-                    donationQueue.push(data);
-                    processQueue();
+                    handleDonation(data.name, data.amount);
                 });
             }, (error) => {
                 console.error("❌ WebSocket error:", error);
             });
         }
 
-        function processQueue() {
-            if (isShowing || donationQueue.length === 0) return;
-
-            isShowing = true;
-            const { name, amount } = donationQueue.shift();
-
-            // Update top donator
-            if (amount > topDonator.amount) {
-                topDonator = { name, amount };
-                topDonatorBox.innerHTML = `🥇 Top Donator: <b>${name}</b> - ₹${amount}`;
-            }
-
-            // Show alert
-            const message = `₹${amount} received from ${name}`;
-            alertBox.textContent = message;
-            alertBox.classList.add("slide-up");
-
+        function handleDonation(name, amount) {
+            // Play sound
             try {
                 audio.currentTime = 0;
                 audio.play();
@@ -180,13 +156,29 @@
                 console.warn("🔇 Audio blocked:", err);
             }
 
-            const duration = Math.min(10000, 3000 + amount * 50);
+            // Update top donator
+            if (amount > topDonator.amount) {
+                topDonator = { name, amount };
+                topDonatorBox.innerHTML = `🥇 Top Donator: <b>${name}</b> - ₹${amount}`;
+            }
 
-            setTimeout(() => {
-                alertBox.classList.remove("slide-up");
-                isShowing = false;
-                setTimeout(processQueue, 500); // show next donation
-            }, duration);
+            // Add donation to DOM
+            const el = document.createElement("div");
+            el.classList.add("alert");
+            el.textContent = `₹${amount} received from ${name}`;
+            alertContainer.appendChild(el);
+
+            // Reset auto-clear timer
+            resetInFiveHours();
+        }
+
+        function resetInFiveHours() {
+            if (resetTimer) clearTimeout(resetTimer);
+            resetTimer = setTimeout(() => {
+                alertContainer.innerHTML = "";
+                topDonator = { name: "", amount: 0 };
+                topDonatorBox.innerHTML = `🥇 Top Donator: None`;
+            }, 1000 * 60 * 60 * 5); // 5 hours
         }
     </script>
 </body>
