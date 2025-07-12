@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Donation Overlay</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        #alert {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 10px 25px;
+            font-size: 1.4rem;
+            font-family: 'Segoe UI', sans-serif;
+            border-radius: 10px;
+            opacity: 0;
+            pointer-events: none;
+            white-space: nowrap;
+            animation-fill-mode: forwards;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes fadeInOut {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+
+            10% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+
+            90% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="alert">Waiting for donations...</div>
+    <audio id="ding" src="Twitch Alert Sound Effect (2).mp3" preload="auto"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+    <script>
+        const alertBox = document.getElementById("alert");
+        const audio = document.getElementById("ding");
+
+        function showAlert(name, amount) {
+            const duration = Math.min(10000, 3000 + amount * 50); // scale with amount
+            const message = `₹${amount} received from ${name}`;
+            console.log("🎬 Showing alert:", message);
+
+            alertBox.textContent = message;
+            alertBox.style.animation = `fadeInOut ${duration}ms ease-in-out`;
+
+            try {
+                audio.currentTime = 0;
+                audio.play();
+            } catch (err) {
+                console.warn("🔇 Audio play blocked:", err);
+            }
+
+            setTimeout(() => {
+                alertBox.style.animation = '';
+            }, duration + 100);
+        }
+
+        // ✅ Update to use production backend WebSocket endpoint
+        const socket = new SockJS("https://upialert-production.up.railway.app/ws");
+        const stompClient = Stomp.over(socket);
+        stompClient.debug = false;
+
+        stompClient.connect({}, (frame) => {
+            console.log("✅ Connected:", frame);
+            stompClient.subscribe("/topic/alerts", (msg) => {
+                const data = JSON.parse(msg.body);
+                console.log("📦 Received:", data);
+                showAlert(data.name, data.amount);
+            });
+        }, (error) => {
+            console.error("❌ WebSocket error:", error);
+        });
+    </script>
+</body>
+
+</html>
